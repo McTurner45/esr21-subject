@@ -24,3 +24,4 @@ from .vaccination_details_admin import VaccinationDetailsAdmin
 from .vaccination_history_admin import VaccinationHistoryAdmin
 from .vital_signs_admin import VitalSignsAdmin
 from .note_to_file_admin import NoteToFileAdmin
+from .screen_out_admin import ScreenOutAdmin

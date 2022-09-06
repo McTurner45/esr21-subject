@@ -468,3 +468,9 @@ BIRTH_METHODS = (
     ('vaginal', 'Vaginal'),
 )
 
+# screenout options
+SCREENOUT_CHOICES = (
+    ('physical_exam_failure', 'Failed physical exam'),
+    ('not_vaccinated', 'Not vaccinated'),
+    (OTHER, 'Other, specify'),
+)

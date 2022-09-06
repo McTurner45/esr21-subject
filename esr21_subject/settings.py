@@ -72,7 +72,7 @@ INSTALLED_APPS = [
     'edc_timepoint.apps.AppConfig',
     'edc_metadata_rules.apps.AppConfig',
     'edc_registration.apps.AppConfig',
-    'edc_data_manager.apps.AppConfig',
+    # 'edc_data_manager.apps.AppConfig',
     'edc_visit_schedule.apps.AppConfig',
     'esr21_prn.apps.AppConfig',
     'esr21_visit_schedule.apps.AppConfig',
