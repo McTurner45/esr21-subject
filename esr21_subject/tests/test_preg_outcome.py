@@ -78,13 +78,6 @@ class TestPregOutcome(TestCase):
             subject_identifier=self.subject_identifier,
             schedule_name='esr21_enrol_schedule3').count(), 2)
 
-        self.assertEqual(
-            CrfMetadata.objects.get(
-                model='esr21_subject.pregnancystatus',
-                subject_identifier=self.subject_identifier,
-                visit_code='1000',
-                visit_code_sequence='0').entry_status, REQUIRED)
-
         day_one_test = mommy.make_recipe(
             'esr21_subject.pregnancytest',
             subject_visit=self.subject_visit,
@@ -92,7 +85,7 @@ class TestPregOutcome(TestCase):
             preg_date=get_utcnow(),
             result=NEG)
 
-        day_one_test.save()
+        self.subject_visit.save()
 
         self.assertEqual(
             CrfMetadata.objects.get(
@@ -116,16 +109,14 @@ class TestPregOutcome(TestCase):
             preg_date=get_utcnow() + relativedelta(days=2),
             result=POS)
 
+        day_28_follow.save()
+
         self.assertEqual(
             CrfMetadata.objects.get(
                 model='esr21_subject.pregoutcome',
                 subject_identifier=self.subject_identifier,
                 visit_code='1028',
                 visit_code_sequence='0').entry_status, NOT_REQUIRED)
-
-        self.subject_visit.save()
-
-        day_one_test.save()
 
         self.assertEqual(
             CrfMetadata.objects.get(
@@ -142,13 +133,6 @@ class TestPregOutcome(TestCase):
             report_datetime=get_utcnow() + relativedelta(days=5),
             reason=SCHEDULED)
 
-        mommy.make_recipe(
-            'esr21_subject.pregnancytest',
-            subject_visit=day_70_visit,
-            preg_date=get_utcnow() + relativedelta(days=5),
-            preg_performed=YES,
-            result=NEG)
-
         self.assertEqual(
             CrfMetadata.objects.get(
                 model='esr21_subject.pregoutcome',
@@ -160,3 +144,12 @@ class TestPregOutcome(TestCase):
             'esr21_subject.pregoutcome',
             report_datetime=get_utcnow(),
             subject_visit=day_70_visit, )
+
+        day_28_follow.save()
+
+        self.assertEqual(
+            CrfMetadata.objects.get(
+                model='esr21_subject.pregoutcome',
+                subject_identifier=self.subject_identifier,
+                visit_code='1028',
+                visit_code_sequence='0').entry_status, NOT_REQUIRED)
