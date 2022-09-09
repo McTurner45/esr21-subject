@@ -5,6 +5,7 @@ from edc_lab.forms.modelform_mixins import RequisitionFormMixin
 
 from ..models import SubjectRequisition
 
+
 class SubjectRequisitionForm(RequisitionFormMixin,
                              FormValidatorMixin):
 

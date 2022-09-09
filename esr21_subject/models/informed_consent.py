@@ -23,7 +23,6 @@ from ..choices import GENDER_OTHER
 from ..choices import IDENTITY_TYPE
 from ..subject_identifier import SubjectIdentifier
 from .model_mixins import SearchSlugModelMixin
-from edc_consent.site_consents import site_consents
 
 
 class InformedConsentManager(ConsentManager, SearchSlugManager, models.Manager):

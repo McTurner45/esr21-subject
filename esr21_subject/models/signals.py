@@ -4,21 +4,21 @@ from django.dispatch import receiver
 from edc_appointment.constants import COMPLETE_APPT
 from edc_appointment.models.appointment import Appointment
 from edc_base.utils import get_uuid
+from edc_constants.constants import YES
 from edc_visit_schedule.site_visit_schedules import site_visit_schedules
 from edc_registration.models import RegisteredSubject
-
-from . import EligibilityConfirmation
-from .informed_consent import InformedConsent
-from .screening_eligibility import ScreeningEligibility
-
+from .eligibility_confirmation import EligibilityConfirmation
 from .adverse_event import AdverseEventRecord
+from .informed_consent import InformedConsent
 from .onschedule import OnSchedule
+from .vaccination_details import VaccinationDetails
+from .vaccination_history import VaccinationHistory
 
 
 @receiver(post_save, weak=False, sender=AdverseEventRecord,
           dispatch_uid="metadata_update_on_post_save")
 def metadata_update_on_post_save(sender, instance, raw, created, using,
-        update_fields, **kwargs):
+                                 update_fields, **kwargs):
     """Update the meta data record on post save of a CRF model.
     """
 
@@ -64,7 +64,7 @@ def appointment_on_post_save(sender, instance, raw, created, **kwargs):
 
 
 def put_on_schedule(schedule_name, onschedule_model, instance=None,
-        onschedule_datetime=None):
+                    onschedule_datetime=None):
     if instance:
         _, schedule = site_visit_schedules.get_by_onschedule_model_schedule_name(
             onschedule_model=onschedule_model, name=schedule_name)
@@ -123,3 +123,32 @@ def informed_consent_on_post_save(sender, instance, raw, created, **kwargs):
                     registered_subject.identity = None
                     registered_subject.identity_or_pk = get_uuid()
                     registered_subject.save()
+
+
+@receiver(post_save, weak=False, sender=VaccinationDetails,
+          dispatch_uid='vaccination_details_on_post_save')
+def vaccination_details_on_post_save(sender, instance, raw, created, **kwargs):
+    if not raw:
+        subject_identifier = instance.subject_visit.subject_identifier
+        try:
+            consent = InformedConsent.objects.filter(
+                subject_identifier=subject_identifier).latest(
+                    'consent_datetime')
+        except InformedConsent.DoesNotExist:
+            raise Exception('Informed consent for participant does not exist.')
+        else:
+            if consent.version == '3':
+                dose = selected_dose(vacc_detail=instance)
+                VaccinationHistory.objects.update_or_create(
+                    subject_identifier=subject_identifier,
+                    defaults={'received_vaccine': YES,
+                              'dose_quantity': dose,
+                              f'dose{dose}_product_name': 'azd_1222',
+                              f'dose{dose}_date': instance.vaccination_date.date()})
+
+
+def selected_dose(vacc_detail=None):
+    dose_map = {'first_dose': '1',
+                'second_dose': '2',
+                'booster_dose': '3'}
+    return dose_map.get(getattr(vacc_detail, 'received_dose_before'))
