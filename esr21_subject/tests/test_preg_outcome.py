@@ -11,6 +11,7 @@ from edc_visit_schedule.models import SubjectScheduleHistory
 from model_mommy import mommy
 
 from esr21_subject.helper_classes import EnrollmentHelper
+from esr21_subject_validation.constants import FIRST_DOSE
 
 
 @tag('preg')
@@ -73,12 +74,8 @@ class TestPregOutcome(TestCase):
             report_datetime=get_utcnow(),
             reason=SCHEDULED)
 
-    def test_preg_outcome_required(self):
-        self.assertEqual(Appointment.objects.filter(
-            subject_identifier=self.subject_identifier,
-            schedule_name='esr21_enrol_schedule3').count(), 2)
-
-        day_one_test = mommy.make_recipe(
+    def test_preg_outcome_not_required_without_pos_test(self):
+        mommy.make_recipe(
             'esr21_subject.pregnancytest',
             subject_visit=self.subject_visit,
             preg_performed=YES,
@@ -94,29 +91,15 @@ class TestPregOutcome(TestCase):
                 visit_code='1000',
                 visit_code_sequence='0').entry_status, NOT_REQUIRED)
 
-        day_28_follow = mommy.make_recipe(
-            'esr21_subject.subjectvisit',
-            appointment=Appointment.objects.get(
-                visit_code='1028',
-                subject_identifier=self.subject_identifier),
-            report_datetime=get_utcnow(),
-            reason=SCHEDULED)
-
+    def test_preg_outcome_not_required_without_vac(self):
         mommy.make_recipe(
             'esr21_subject.pregnancytest',
-            subject_visit=day_28_follow,
+            subject_visit=self.subject_visit,
             preg_performed=YES,
-            preg_date=get_utcnow() + relativedelta(days=2),
+            preg_date=get_utcnow(),
             result=POS)
 
-        day_28_follow.save()
-
-        self.assertEqual(
-            CrfMetadata.objects.get(
-                model='esr21_subject.pregoutcome',
-                subject_identifier=self.subject_identifier,
-                visit_code='1028',
-                visit_code_sequence='0').entry_status, NOT_REQUIRED)
+        self.subject_visit.save()
 
         self.assertEqual(
             CrfMetadata.objects.get(
@@ -125,31 +108,33 @@ class TestPregOutcome(TestCase):
                 visit_code='1000',
                 visit_code_sequence='0').entry_status, NOT_REQUIRED)
 
-        day_70_visit = mommy.make_recipe(
+    def test_preg_outcome_required(self):
+
+        mommy.make_recipe(
+            'esr21_subject.vaccinationdetails',
+            subject_visit=self.subject_visit,
+            report_datetime=get_utcnow(),
+            received_dose_before=FIRST_DOSE,
+            vaccination_date=get_utcnow(),
+            next_vaccination_date=(get_utcnow() + relativedelta(days=56)).date())
+
+        mommy.make_recipe(
+            'esr21_subject.pregnancytest',
+            subject_visit=self.subject_visit,
+            preg_performed=YES,
+            preg_date=get_utcnow(),
+            result=POS)
+        mommy.make_recipe(
             'esr21_subject.subjectvisit',
             appointment=Appointment.objects.get(
-                visit_code='1070',
+                visit_code='1028',
                 subject_identifier=self.subject_identifier),
-            report_datetime=get_utcnow() + relativedelta(days=5),
+            report_datetime=get_utcnow(),
             reason=SCHEDULED)
 
         self.assertEqual(
             CrfMetadata.objects.get(
                 model='esr21_subject.pregoutcome',
                 subject_identifier=self.subject_identifier,
-                visit_code='1070',
-                visit_code_sequence='0').entry_status, REQUIRED)
-
-        mommy.make_recipe(
-            'esr21_subject.pregoutcome',
-            report_datetime=get_utcnow(),
-            subject_visit=day_70_visit, )
-
-        day_28_follow.save()
-
-        self.assertEqual(
-            CrfMetadata.objects.get(
-                model='esr21_subject.pregoutcome',
-                subject_identifier=self.subject_identifier,
                 visit_code='1028',
-                visit_code_sequence='0').entry_status, NOT_REQUIRED)
+                visit_code_sequence='0').entry_status, REQUIRED)
