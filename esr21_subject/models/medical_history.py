@@ -103,6 +103,14 @@ class MedicalHistory(CrfModelMixin):
         blank=True,
         null=True)
 
+    received_art = models.CharField(
+        verbose_name='Has the participant ever taken anti-retroviral therapy '
+        'or ART?',
+        max_length=3,
+        choices=YES_NO,
+        blank=True,
+        null=True)
+
     no_of_mass_gathering = models.PositiveIntegerField(
         default=0,
         verbose_name=('How many mass gatherings has the participant attended '

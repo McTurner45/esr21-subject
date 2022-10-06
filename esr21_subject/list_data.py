@@ -107,12 +107,7 @@ list_data = {
         (OTHER, 'Other'),
         (NOT_APPLICABLE, 'Not Applicable')
     ],
-    'esr21_subject.subjectidentifiers':[
-        
-    ]
-    
-    
-
+    'esr21_subject.subjectidentifiers': []
 }
 
 id_list = []

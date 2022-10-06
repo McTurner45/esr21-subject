@@ -2,7 +2,7 @@ from dateutil.relativedelta import relativedelta
 from django.test import TestCase, tag
 from edc_appointment.models import Appointment
 from edc_base.utils import get_utcnow
-from edc_constants.constants import OMANG, FEMALE, MALE, NO, YES, NEG
+from edc_constants.constants import OMANG, FEMALE, MALE, NO, YES, NEG, POS
 from edc_facility.import_holidays import import_holidays
 from edc_metadata.constants import REQUIRED, NOT_REQUIRED
 from edc_metadata.models import CrfMetadata, RequisitionMetadata
@@ -11,16 +11,18 @@ from edc_visit_tracking.constants import SCHEDULED
 from model_mommy import mommy
 
 from ..models import ScreeningEligibility, Covid19Results
+from ..helper_classes import EnrollmentHelper
 
 
-@tag('rg')
 class TestRuleGroups(TestCase):
 
     def setUp(self):
         import_holidays()
 
+        self.enrol_helper = EnrollmentHelper
+
         self.eligibility = mommy.make_recipe(
-            'esr21_subject.eligibilityconfirmation')
+            'esr21_subject.eligibilityconfirmation', )
 
         self.consent_options = {
             'screening_identifier': self.eligibility.screening_identifier,
@@ -35,39 +37,38 @@ class TestRuleGroups(TestCase):
             'identity_type': OMANG,
             'gender': FEMALE}
 
-        self.subject_consent = mommy.make_recipe(
+        consent = mommy.make_recipe(
             'esr21_subject.informedconsent',
             **self.consent_options)
 
         mommy.make_recipe(
             'esr21_subject.screeningeligibility',
-            subject_identifier=self.subject_consent.subject_identifier)
+            subject_identifier=consent.subject_identifier,
+            symptomatic_infections_experiences=NO,
+            is_eligible=True)
 
-        self.subject_identifier = self.subject_consent.subject_identifier
+        self.subject_identifier = consent.subject_identifier
 
-        screening_eligibility = ScreeningEligibility.objects.get(
-            subject_identifier=self.subject_identifier)
+        mommy.make_recipe(
+            'esr21_subject.vaccinationhistory',
+            subject_identifier=self.subject_identifier,
+            received_vaccine=NO,
+            dose_quantity=None)
 
-        if screening_eligibility.is_eligible:
-            cohort = 'esr21'
-            onschedule_model = 'esr21_subject.onschedule'
+        self.cohort = 'esr21'
+        self.schedule_enrollment = self.enrol_helper(
+            cohort=self.cohort, subject_identifier=self.subject_identifier)
+        self.schedule_enrollment.schedule_enrol()
 
-            self.put_on_schedule(f'{cohort}_enrol_schedule', onschedule_model=onschedule_model,
-                                 onschedule_datetime=screening_eligibility.created.replace(microsecond=0))
+        self.subject_visit = mommy.make_recipe(
+            'esr21_subject.subjectvisit',
+            appointment=Appointment.objects.get(
+                visit_code='1000',
+                visit_code_sequence='0',
+                subject_identifier=consent.subject_identifier),
+            report_datetime=get_utcnow(),
+            reason=SCHEDULED)
 
-            self.put_on_schedule(f'{cohort}_fu_schedule',
-                                 onschedule_model=onschedule_model,
-                                 onschedule_datetime=screening_eligibility.created.replace(microsecond=0))
-
-            self.subject_visit = mommy.make_recipe(
-                'esr21_subject.subjectvisit',
-                appointment=Appointment.objects.get(
-                    visit_code='1000',
-                    subject_identifier=self.subject_consent.subject_identifier),
-                report_datetime=get_utcnow(),
-                reason=SCHEDULED)
-
-    @tag('rg1')
     def test_pregnancy_form_required(self):
         self.assertEqual(
             CrfMetadata.objects.get(
@@ -107,7 +108,18 @@ class TestRuleGroups(TestCase):
 
         mommy.make_recipe(
             'esr21_subject.screeningeligibility',
-            subject_identifier=subject_consent.subject_identifier)
+            subject_identifier=subject_consent.subject_identifier,
+            is_eligible=True)
+
+        mommy.make_recipe(
+            'esr21_subject.vaccinationhistory',
+            subject_identifier=subject_consent.subject_identifier,
+            received_vaccine=NO,
+            dose_quantity=None)
+
+        self.schedule_enrollment = self.enrol_helper(
+            cohort=self.cohort, subject_identifier=subject_consent.subject_identifier)
+        self.schedule_enrollment.schedule_enrol()
 
         mommy.make_recipe(
             'esr21_subject.subjectvisit',
@@ -132,62 +144,62 @@ class TestRuleGroups(TestCase):
                 visit_code='1000',
                 visit_code_sequence='0').entry_status, NOT_REQUIRED)
 
-    @tag('pt1')
     def test_pregnancy_test_required(self):
-        self.consent_options['dob'] = (get_utcnow() - relativedelta(years=55)).date()
-        self.consent_options['identity'] = '111125678'
-        self.consent_options['confirm_identity'] = '111125678'
-
-        subject_consent = mommy.make_recipe(
-            'esr21_subject.informedconsent',
-            **self.consent_options)
-
-        mommy.make_recipe(
-            'esr21_subject.screeningeligibility',
-            subject_identifier=subject_consent.subject_identifier)
-
-        subject_visit = mommy.make_recipe(
-            'esr21_subject.subjectvisit',
-            appointment=Appointment.objects.get(
-                visit_code='1000',
-                subject_identifier=subject_consent.subject_identifier),
-            report_datetime=get_utcnow(),
-            reason=SCHEDULED)
-
         mommy.make_recipe(
             'esr21_subject.pregnancystatus',
-            subject_visit=subject_visit,
+            subject_visit=self.subject_visit,
             post_menopausal=NO,
             surgically_sterilized=NO)
 
         self.assertEqual(
             CrfMetadata.objects.get(
                 model='esr21_subject.pregnancytest',
-                subject_identifier=subject_consent.subject_identifier,
+                subject_identifier=self.subject_identifier,
                 visit_code='1000',
                 visit_code_sequence='0').entry_status, REQUIRED)
 
-    @tag('cr')
-    def test_covid19_results(self):
-        #
-        # appointment = Appointment.objects.get(
-        #         visit_code='1000',
-        #         subject_identifier=self.subject_identifier)
-        #
-        # subject_visit = mommy.make_recipe(
-        #     'esr21_subject.subjectvisit',
-        #     appointment=appointment,
-        #     report_datetime=get_utcnow(),
-        #     reason=SCHEDULED)
+    @tag('rg')
+    def test_pos_preg_vax_not_required(self):
+        self.assertEqual(
+            CrfMetadata.objects.get(
+                model='esr21_subject.vaccinationdetails',
+                subject_identifier=self.subject_identifier,
+                visit_code='1000',
+                visit_code_sequence='0').entry_status, REQUIRED)
 
+        mommy.make_recipe(
+            'esr21_subject.pregnancystatus',
+            subject_visit=self.subject_visit,
+            post_menopausal=NO,
+            surgically_sterilized=NO)
+
+        self.assertEqual(
+            CrfMetadata.objects.get(
+                model='esr21_subject.pregnancytest',
+                subject_identifier=self.subject_identifier,
+                visit_code='1000',
+                visit_code_sequence='0').entry_status, REQUIRED)
+
+        mommy.make_recipe(
+            'esr21_subject.pregnancytest',
+            subject_visit=self.subject_visit,
+            result=POS)
+
+        self.assertEqual(
+            CrfMetadata.objects.get(
+                model='esr21_subject.vaccinationdetails',
+                subject_identifier=self.subject_identifier,
+                visit_code='1000',
+                visit_code_sequence='0').entry_status, NOT_REQUIRED)
+
+    def test_covid19_results(self):
         mommy.make_recipe(
             'esr21_subject.covid19results',
             subject_visit=self.subject_visit,
             covid_result=NEG)
 
-        covid19 = CrfMetadata.objects.filter(subject_identifier=self.subject_identifier)
-
-        print(f'{covid19}')
+        covid19 = CrfMetadata.objects.filter(
+            subject_identifier=self.subject_identifier)
 
         self.assertEqual(
             CrfMetadata.objects.get(
@@ -195,11 +207,3 @@ class TestRuleGroups(TestCase):
                 subject_identifier=self.subject_identifier,
                 visit_code='1000',
                 visit_code_sequence='0').entry_status, REQUIRED)
-
-    def put_on_schedule(self, schedule_name, onschedule_model, onschedule_datetime=None):
-        _, schedule = site_visit_schedules.get_by_onschedule_model_schedule_name(
-            onschedule_model=onschedule_model, name=schedule_name)
-        schedule.put_on_schedule(
-            subject_identifier=self.subject_identifier,
-            onschedule_datetime=onschedule_datetime,
-            schedule_name=schedule_name)

@@ -19,6 +19,7 @@ class MedicalHistoryForm(SubjectModelFormMixin, forms.ModelForm):
         return django_apps.get_model(self.medical_diagnosis)
 
     def clean(self):
+        super().clean()
         total_medical_diagnosis = int(self.data.get('medicaldiagnosis_set-TOTAL_FORMS'))
         relevant_history = self.data.get('relevant_history')
         if relevant_history == YES and total_medical_diagnosis == 0:

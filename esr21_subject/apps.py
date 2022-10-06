@@ -68,8 +68,8 @@ if settings.APP_NAME == 'esr21_subject':
                                  slots=[100, 100, 100, 100, 100])}
 
     class EdcProtocolAppConfig(BaseEdcProtocolAppConfigs):
-        protocol = 'ADZ1222'
-        protocol_name = 'ADZ 1222 - ESR-21-21311'
+        protocol = 'AZD1222'
+        protocol_name = 'AZD 1222 - ESR-21-21311'
         protocol_number = '150'
         protocol_title = ''
         study_open_datetime = datetime(
