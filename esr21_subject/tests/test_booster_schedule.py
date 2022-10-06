@@ -1,16 +1,15 @@
 from dateutil.relativedelta import relativedelta
+from django.apps import apps as django_apps
 from django.test import TestCase, tag
 from edc_appointment.models import Appointment
 from edc_base.utils import get_utcnow
 from edc_constants.constants import YES, NO, FEMALE, OMANG
 from edc_facility.import_holidays import import_holidays
-from edc_metadata.models import CrfMetadata
 from edc_metadata.constants import REQUIRED, NOT_REQUIRED
-from esr21_subject.helper_classes import EnrollmentHelper
-from django.apps import apps as django_apps
-
+from edc_metadata.models import CrfMetadata
 from model_mommy import mommy
 
+from esr21_subject.helper_classes import EnrollmentHelper
 from ..models import OnSchedule
 
 
@@ -111,6 +110,7 @@ class TestBoosterScheduleSetup(TestCase):
         self.assertEqual(Appointment.objects.filter(
             subject_identifier=self.consent.subject_identifier).count(), 4)
 
+    @tag('cccx')
     def test_metadata_creation_booster(self):
         appointment_170 = Appointment.objects.get(
             subject_identifier=self.consent.subject_identifier,
@@ -127,33 +127,38 @@ class TestBoosterScheduleSetup(TestCase):
                           'covid19preventativebehaviours', 'medicalhistory']
 
         for required in entry_required:
+            print(CrfMetadata.objects.get(
+                model=f'esr21_subject.{required}',
+                subject_identifier=self.consent.subject_identifier,
+                visit_code='1170').entry_status)
             self.assertEqual(
                 CrfMetadata.objects.get(
                     model=f'esr21_subject.{required}',
                     subject_identifier=self.consent.subject_identifier,
                     visit_code='1170').entry_status, REQUIRED)
 
+    @tag('cca')
     def test_metadata_not_req_booster(self):
-        vac_history_cls = django_apps.get_model('esr21_subject.vaccinationhistory')
-        try:
-            vac_history_obj = vac_history_cls.objects.get(
-                subject_identifier=self.subject_identifier, )
-        except vac_history_cls.DoesNotExist:
-            pass
-        else:
-            vac_history_obj.dose1_product_name = 'azd_1222'
-            vac_history_obj.dose2_product_name = 'azd_1222'
-            vac_history_obj.save()
-
         appointment_170 = Appointment.objects.get(
             subject_identifier=self.consent.subject_identifier,
             visit_code='1170')
+
+        appointment_1198 = Appointment.objects.get(
+            subject_identifier=self.consent.subject_identifier,
+            visit_code='1198')
 
         mommy.make_recipe(
             'esr21_subject.subjectvisit',
             subject_identifier=self.consent.subject_identifier,
             report_datetime=get_utcnow(),
+            visit_code_sequence=1,
             appointment=appointment_170)
+
+        mommy.make_recipe(
+            'esr21_subject.subjectvisit',
+            subject_identifier=self.consent.subject_identifier,
+            report_datetime=get_utcnow(),
+            appointment=appointment_1198)
 
         entry_required = ['demographicsdata', 'rapidhivtesting',
                           'covid19preventativebehaviours', 'medicalhistory']
@@ -163,4 +168,4 @@ class TestBoosterScheduleSetup(TestCase):
                 CrfMetadata.objects.get(
                     model=f'esr21_subject.{required}',
                     subject_identifier=self.consent.subject_identifier,
-                    visit_code='1170').entry_status, NOT_REQUIRED)
+                    visit_code='1198').entry_status, NOT_REQUIRED)
